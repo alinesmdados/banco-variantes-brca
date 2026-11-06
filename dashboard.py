@@ -119,9 +119,15 @@ def painel(conn: sqlite3.Connection, salvar_em: str | None = None):
     # 6. Hotspots ao longo dos genes
     hot = consultar(conn, "hotspots")
     for gene, dados in hot.groupby("gene"):
+        # Descarta blocos isolados nas pontas (0,5% das variantes de cada lado), que
+        # correspondem a registros em regiões vizinhas e distorceriam o eixo.
+        dados = dados.sort_values("inicio_bloco")
+        acumulado = dados["patogenicas"].cumsum() / dados["patogenicas"].sum()
+        inicio_faixa = acumulado - dados["patogenicas"] / dados["patogenicas"].sum()
+        dados = dados[(acumulado > 0.005) & (inicio_faixa < 0.995)]
         posicao_relativa = (dados["inicio_bloco"] - dados["inicio_bloco"].min()) / 1000
-        a6.plot(posicao_relativa, dados["patogenicas"], drawstyle="steps-mid",
-                color=CORES_GENE.get(gene, "#777"), label=gene)
+        a6.bar(posicao_relativa, dados["patogenicas"], width=1.8, alpha=0.7,
+               color=CORES_GENE.get(gene, "#777"), label=gene)
     a6.set_title("Distribuição das variantes patogênicas\nao longo do gene (blocos de 2 kb)")
     a6.set_xlabel("Distância do início da região (kb)")
     a6.set_ylabel("Variantes patogênicas")
