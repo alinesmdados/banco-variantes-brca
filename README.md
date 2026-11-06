@@ -4,10 +4,31 @@
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
 ![SQLite](https://img.shields.io/badge/SQL-SQLite-lightgrey)
 ![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-green)
+[![Atualizar banco do ClinVar](https://github.com/alinesmdados/banco-variantes-brca/actions/workflows/atualizar_banco.yml/badge.svg)](https://github.com/alinesmdados/banco-variantes-brca/actions/workflows/atualizar_banco.yml)
 
 Pipeline de dados que monta um **banco relacional (SQLite)** com as variantes genéticas dos genes **BRCA1** e **BRCA2** registradas no **ClinVar** (NCBI), responde perguntas clínicas com **SQL** e apresenta os resultados em um **dashboard**.
 
 Variantes patogênicas em BRCA1/BRCA2 estão associadas à síndrome de câncer de mama e ovário hereditários. Organizar essas variantes por classificação clínica, tipo de alteração e nível de evidência ajuda a entender um dos principais desafios da genética clínica: as **variantes de significado incerto**.
+
+## Dashboard
+
+![Painel de variantes BRCA1 e BRCA2](dados/painel_brca.png)
+
+*Painel gerado automaticamente a partir do banco. A imagem é atualizada todo mês.*
+
+## Principais resultados
+
+Na primeira execução (novembro de 2026), o banco reuniu **36.178 variantes**:
+
+| Gene | Variantes | Patogênicas | Significado incerto |
+|---|---:|---:|---:|
+| BRCA1 | 14.132 | 28,5% | 16,7% |
+| BRCA2 | 22.046 | 27,2% | 19,9% |
+
+- Variantes que **truncam a proteína** (*frameshift*, *nonsense* e de sítio de *splicing*) são classificadas como patogênicas em quase 100% dos casos já interpretados, enquanto as *missense* ficam em torno de 25%. Isso é coerente com o papel dos genes BRCA na reparação do DNA: perder a proteína inteira tende a ser mais grave que trocar um único aminoácido.
+- Cerca de **1 em cada 5 variantes** ainda tem **significado incerto**, o que mostra o tamanho do desafio na interpretação de exames genéticos.
+
+Os números mudam a cada atualização do ClinVar. Os valores atuais ficam em [`dados/visao_geral.csv`](dados/visao_geral.csv).
 
 ## Arquitetura
 
@@ -20,6 +41,10 @@ etl_clinvar.py ── transformação ──► clinvar_brca.db (SQLite, schema.
                                             ▼
                           consultas.sql ──► dashboard.py ──► painel (6 gráficos)
 ```
+
+### Atualização automática (GitHub Actions)
+
+O workflow [`.github/workflows/atualizar_banco.yml`](.github/workflows/atualizar_banco.yml) roda **todo dia 1º do mês** (e sempre que o código do pipeline muda). Ele executa os testes, baixa os dados do ClinVar, reconstrói o banco, gera o painel e salva tudo na pasta `dados/`. Assim, o banco permanece atualizado sem intervenção manual.
 
 ## Modelo de dados
 
@@ -45,18 +70,18 @@ etl_clinvar.py ── transformação ──► clinvar_brca.db (SQLite, schema.
 ## Como usar
 
 ### No Google Colab (recomendado)
-Clique em **"Abrir no Colab"** e execute *Ambiente de execução → Executar tudo*. O download dos dados do ClinVar leva de 1 a 3 minutos.
+Clique em **"Abrir no Colab"** e execute *Ambiente de execução → Executar tudo*. O notebook usa o banco pronto da pasta `dados/` e roda em poucos segundos. Para baixar tudo de novo do ClinVar (10 a 15 minutos), altere `ATUALIZAR_DO_CLINVAR = True`.
 
 ### Localmente
 ```bash
 git clone https://github.com/alinesmdados/banco-variantes-brca.git
 cd banco-variantes-brca
 pip install -r requirements.txt
-python etl_clinvar.py --db clinvar_brca.db      # monta o banco
-sqlite3 clinvar_brca.db < consultas.sql          # executa as consultas
+sqlite3 dados/clinvar_brca.db < consultas.sql    # consulta o banco pronto
+python etl_clinvar.py --db clinvar_brca.db       # ou reconstrói o banco do zero
 ```
 
-O arquivo `clinvar_brca.db` pode ser aberto em ferramentas como DBeaver, Power BI ou Metabase.
+O arquivo `dados/clinvar_brca.db` pode ser aberto em ferramentas como DBeaver, Power BI ou Metabase.
 
 ## Testes
 
@@ -79,6 +104,8 @@ banco-variantes-brca/
 ├── dashboard.py                # gráficos do painel
 ├── banco_variantes_brca.ipynb  # notebook com todo o fluxo
 ├── test_banco.py               # testes automatizados
+├── dados/                      # banco pronto, painel e resumo (gerados automaticamente)
+├── .github/workflows/          # atualização mensal via GitHub Actions
 ├── requirements.txt
 └── LICENSE
 ```
