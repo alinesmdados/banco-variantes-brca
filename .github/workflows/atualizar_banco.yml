@@ -1,0 +1,40 @@
+name: Atualizar banco do ClinVar
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 1 * *"
+  push:
+    branches: [main]
+    paths:
+      - etl_clinvar.py
+      - schema.sql
+      - consultas.sql
+      - dashboard.py
+      - .github/workflows/atualizar_banco.yml
+
+permissions:
+  contents: write
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: pytest -q
+      - name: Montar banco e gerar painel
+        run: |
+          mkdir -p dados
+          python -c "import matplotlib; matplotlib.use('Agg'); import etl_clinvar as etl, dashboard as dash; c = etl.construir_banco('dados/clinvar_brca.db'); dash.painel(c, salvar_em='dados/painel_brca.png'); dash.consultar(c, 'visao_geral').to_csv('dados/visao_geral.csv', index=False); c.execute('VACUUM'); c.close()"
+      - name: Salvar resultados
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f dados/
+          git commit -m "Atualiza banco de variantes do ClinVar (automatico)" || echo "Sem mudancas"
+          git push
